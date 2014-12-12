@@ -12,7 +12,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/gorilla/handlers"
+	"github.com/go-martini/martini"
+	"github.com/martini-contrib/cors"
 )
 
 var completedFiles = make(chan string, 100)
@@ -23,22 +24,18 @@ func main() {
 		go assembleFile(completedFiles)
 	}
 
-	m := http.NewServeMux()
+	m := martini.Classic()
+	m.Use(cors.Allow(&cors.Options{
+		AllowOrigins:     []string{"*"},
+		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH"},
+		AllowHeaders:     []string{"Origin"},
+		ExposeHeaders:    []string{"Content-Length"},
+		AllowCredentials: true,
+	}))
+	m.Get("/", streamHandler(uploadHandler))
+	m.Post("/", streamHandler(uploadHandler))
 
-	m.Handle("/", streamHandler(uploadHandler))
-
-	m.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != "GET" {
-			w.WriteHeader(404)
-			return
-		}
-		f, _ := os.Open("./index.html")
-		body, _ := ioutil.ReadAll(f)
-		w.Write(body)
-	})
-
-	handler := handlers.LoggingHandler(os.Stdout, m)
-	http.ListenAndServe(":3000", handler)
+	m.Run()
 }
 
 type ByChunk []os.FileInfo
