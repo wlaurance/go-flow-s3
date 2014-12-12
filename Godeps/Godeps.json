@@ -1,0 +1,10 @@
+{
+	"ImportPath": "github.com/wlaurance/golang-flowjs-upload",
+	"GoVersion": "go1.2.1",
+	"Deps": [
+		{
+			"ImportPath": "github.com/gorilla/handlers",
+			"Rev": "0e84b7d810c16aed432217e330206be156bafae0"
+		}
+	]
+}

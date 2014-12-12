@@ -25,11 +25,7 @@ func main() {
 
 	m := http.NewServeMux()
 
-	m.Handle("/upload", streamHandler(uploadHandler))
-
-	m.HandleFunc("/public/", func(w http.ResponseWriter, r *http.Request) {
-		http.ServeFile(w, r, r.URL.Path[1:])
-	})
+	m.Handle("/", streamHandler(uploadHandler))
 
 	m.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != "GET" {
