@@ -15,6 +15,18 @@
 		{
 			"ImportPath": "github.com/martini-contrib/cors",
 			"Rev": "553b9208d353a39b0850c02355f478ba020c86d7"
+		},
+		{
+			"ImportPath": "github.com/mitchellh/goamz/aws",
+			"Rev": "b2b88cfe3619bb45c4df8670f7130dbfbf82b2cc"
+		},
+		{
+			"ImportPath": "github.com/mitchellh/goamz/s3",
+			"Rev": "b2b88cfe3619bb45c4df8670f7130dbfbf82b2cc"
+		},
+		{
+			"ImportPath": "github.com/vaughan0/go-ini",
+			"Rev": "a98ad7ee00ec53921f08832bc06ecf7fd600e6a1"
 		}
 	]
 }
