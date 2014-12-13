@@ -123,6 +123,7 @@ func assembleFile(jobs <-chan string) {
 		}
 		defer dst.Close()
 
+		fmt.Print(dst)
 		sort.Sort(ByChunk(fileInfos))
 		for _, fs := range fileInfos {
 			src, err := os.Open(path + "/" + fs.Name())
