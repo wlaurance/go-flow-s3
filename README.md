@@ -18,7 +18,7 @@ the `AWS_ACCESS_KEY_ID` and the `AWS_SECRET_ACCESS_KEY` in your environment.
 
 go-flow-s3 attempts to limit scope as much as possible. Therefore, you must provide
 the `BUCKETNAME` in your env. The AWS credentials for `mitchellh/amz` must have
-GET, PUT, and DELETE permissions for your particular `BUCKETNAME`.
+GET, PUT, and DELETE permissions for your particular `S3_BUCKET`.
 
 This micro service is running on a Dokku instance, but could easily be run on a
 Heroku Dyno or your own server.
