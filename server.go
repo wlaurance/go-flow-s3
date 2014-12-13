@@ -1,6 +1,9 @@
 package main
 
 import (
+	"fmt"
+	"github.com/go-martini/martini"
+	"github.com/martini-contrib/cors"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -8,9 +11,6 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-
-	"github.com/go-martini/martini"
-	"github.com/martini-contrib/cors"
 )
 
 var completedFiles = make(chan string, 100)
@@ -66,18 +66,21 @@ func chunkedReader(w http.ResponseWriter, r *http.Request) error {
 	chunkDirPath := "./incomplete/" + r.FormValue("flowFilename")
 	err := os.MkdirAll(chunkDirPath, 02750)
 	if err != nil {
+		fmt.Print(err)
 		return err
 	}
 
 	for _, fileHeader := range r.MultipartForm.File["file"] {
 		src, err := fileHeader.Open()
 		if err != nil {
+			fmt.Print(err)
 			return err
 		}
 		defer src.Close()
 
 		dst, err := os.Create(chunkDirPath + "/" + r.FormValue("flowChunkNumber"))
 		if err != nil {
+			fmt.Print(err)
 			return err
 		}
 		defer dst.Close()
@@ -85,6 +88,7 @@ func chunkedReader(w http.ResponseWriter, r *http.Request) error {
 
 		fileInfos, err := ioutil.ReadDir(chunkDirPath)
 		if err != nil {
+			fmt.Print(err)
 			return err
 		}
 
@@ -92,6 +96,7 @@ func chunkedReader(w http.ResponseWriter, r *http.Request) error {
 
 		cT, err := strconv.Atoi(chunkTotal)
 		if err != nil {
+			fmt.Print(err)
 			return err
 		}
 		if len(fileInfos) == cT {
@@ -105,12 +110,14 @@ func assembleFile(jobs <-chan string) {
 	for path := range jobs {
 		fileInfos, err := ioutil.ReadDir(path)
 		if err != nil {
+			fmt.Print(err)
 			return
 		}
 
 		// create final file to write to
 		dst, err := os.Create(strings.Split(path, "/")[2])
 		if err != nil {
+			fmt.Print(err)
 			return
 		}
 		defer dst.Close()
@@ -119,6 +126,7 @@ func assembleFile(jobs <-chan string) {
 		for _, fs := range fileInfos {
 			src, err := os.Open(path + "/" + fs.Name())
 			if err != nil {
+				fmt.Print(err)
 				return
 			}
 			defer src.Close()
