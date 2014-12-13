@@ -57,6 +57,8 @@ func continueUpload(w http.ResponseWriter, r *http.Request) {
 	if _, err := os.Stat(chunkDirPath); err != nil {
 		w.WriteHeader(404)
 		return
+	} else {
+		fmt.Print(err)
 	}
 }
 
