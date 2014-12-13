@@ -4,22 +4,17 @@ import (
 	"fmt"
 	"github.com/go-martini/martini"
 	"github.com/martini-contrib/cors"
-	"io"
 	"io/ioutil"
 	"net/http"
 	"os"
-	"sort"
 	"strconv"
-	"strings"
 )
 
-var completedFiles = make(chan string, 100)
+type flowFileChunks map[string][]byte
+
+var flowFiles map[string]flowFileChunks = make(map[string]flowFileChunks)
 
 func main() {
-	for i := 0; i < 3; i++ {
-		go assembleFile(completedFiles)
-	}
-
 	m := martini.Classic()
 	m.Use(cors.Allow(&cors.Options{
 		AllowOrigins:     []string{"*"},
@@ -52,10 +47,47 @@ func (fn streamHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func getFlowFileKey(r *http.Request) string {
+	return r.FormValue("flowFilename")
+}
+
+func getFlowFile(r *http.Request) (flowFileChunks, bool) {
+	chunks, ok := flowFiles[getFlowFileKey(r)]
+	return chunks, ok
+}
+
+func flowFileExist(r *http.Request) bool {
+	if _, ok := getFlowFile(r); ok {
+		return ok
+	} else {
+		return !ok
+	}
+}
+
+func flowFileNumberOfChunks(r *http.Request) int {
+	if chunks, ok := getFlowFile(r); ok {
+		return len(chunks)
+	} else {
+		return 0
+	}
+}
+
+func saveChunkBytes(r *http.Request, bytes []byte) {
+	if chunks, ok := getFlowFile(r); ok {
+		chunks[r.FormValue("flowChunkNumber")] = bytes
+		saveFlowFileChunks(r, chunks)
+	} else {
+		flowFiles[getFlowFileKey(r)] = make(flowFileChunks)
+		flowFiles[getFlowFileKey(r)][r.FormValue("flowChunkNumber")] = bytes
+	}
+}
+
+func saveFlowFileChunks(r *http.Request, chunks flowFileChunks) {
+	flowFiles[getFlowFileKey(r)] = chunks
+}
+
 func continueUpload(w http.ResponseWriter, r *http.Request) {
-	chunkDirPath := "./incomplete/" + r.FormValue("flowFilename") + "/" + r.FormValue("flowChunkNumber")
-	if _, err := os.Stat(chunkDirPath); err != nil {
-		fmt.Print(err)
+	if flowFileExist(r) {
 		w.WriteHeader(404)
 		return
 	}
@@ -63,13 +95,6 @@ func continueUpload(w http.ResponseWriter, r *http.Request) {
 
 func chunkedReader(w http.ResponseWriter, r *http.Request) error {
 	r.ParseMultipartForm(25)
-
-	chunkDirPath := "./incomplete/" + r.FormValue("flowFilename")
-	err := os.MkdirAll(chunkDirPath, 02750)
-	if err != nil {
-		fmt.Print(err)
-		return err
-	}
 
 	for _, fileHeader := range r.MultipartForm.File["file"] {
 		src, err := fileHeader.Open()
@@ -79,18 +104,12 @@ func chunkedReader(w http.ResponseWriter, r *http.Request) error {
 		}
 		defer src.Close()
 
-		dst, err := os.Create(chunkDirPath + "/" + r.FormValue("flowChunkNumber"))
+		bytes, err := ioutil.ReadAll(src)
 		if err != nil {
 			fmt.Print(err)
 			return err
-		}
-		defer dst.Close()
-		io.Copy(dst, src)
-
-		fileInfos, err := ioutil.ReadDir(chunkDirPath)
-		if err != nil {
-			fmt.Print(err)
-			return err
+		} else {
+			saveChunkBytes(r, bytes)
 		}
 
 		var chunkTotal = r.FormValue("flowTotalChunks")
@@ -100,40 +119,12 @@ func chunkedReader(w http.ResponseWriter, r *http.Request) error {
 			fmt.Print(err)
 			return err
 		}
-		if len(fileInfos) == cT {
-			completedFiles <- chunkDirPath
+		if flowFileNumberOfChunks(r) == cT {
+			fmt.Print("All done")
+			w.Write([]byte("Completed Upload"))
+		} else {
+			fmt.Print("not done yet")
 		}
 	}
 	return nil
-}
-
-func assembleFile(jobs <-chan string) {
-	for path := range jobs {
-		fileInfos, err := ioutil.ReadDir(path)
-		if err != nil {
-			fmt.Print(err)
-			return
-		}
-
-		// create final file to write to
-		dst, err := os.Create(strings.Split(path, "/")[2])
-		if err != nil {
-			fmt.Print(err)
-			return
-		}
-		defer dst.Close()
-
-		fmt.Print(dst)
-		sort.Sort(ByChunk(fileInfos))
-		for _, fs := range fileInfos {
-			src, err := os.Open(path + "/" + fs.Name())
-			if err != nil {
-				fmt.Print(err)
-				return
-			}
-			defer src.Close()
-			io.Copy(dst, src)
-		}
-		os.RemoveAll(path)
-	}
 }
