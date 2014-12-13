@@ -1,10 +1,16 @@
 package main
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
+	"errors"
 	"fmt"
 	"github.com/go-martini/martini"
 	"github.com/martini-contrib/cors"
+	"github.com/mitchellh/goamz/aws"
+	"github.com/mitchellh/goamz/s3"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"os"
 	"strconv"
@@ -141,5 +147,34 @@ func chunkedReader(w http.ResponseWriter, r *http.Request) error {
 }
 
 func exportFlowFile(r *http.Request) (string, error) {
-	return "url", nil
+	auth, err := aws.EnvAuth()
+	if err != nil {
+		log.Fatal(err)
+	}
+	client := s3.New(auth, aws.USEast)
+	bucket := client.Bucket(os.Getenv("S3_BUCKET"))
+	imageBytes, err := getFlowFileBytes(r)
+	hash := sha256.New()
+	hash.Write(imageBytes)
+	md := hash.Sum(nil)
+	mdStr := hex.EncodeToString(md)
+	fileName := mdStr + ".jpg"
+	putError := bucket.Put(fileName, imageBytes, "image/jpeg", s3.PublicRead)
+	if putError != nil {
+		log.Fatal(putError)
+		return "", putError
+	}
+	return bucket.URL(fileName), nil
+}
+
+func getFlowFileBytes(r *http.Request) ([]byte, error) {
+	chunks, ok := getFlowFile(r)
+	if ok {
+		image := make([]byte, 0)
+		for _, chunk := range chunks {
+			image = append(image, chunk...)
+		}
+		return image, nil
+	}
+	return nil, errors.New("Image bytes not found")
 }
