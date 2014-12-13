@@ -49,12 +49,6 @@ func (a ByChunk) Less(i, j int) bool {
 
 type streamHandler func(http.ResponseWriter, *http.Request) error
 
-func (fn streamHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if err := fn(w, r); err != nil {
-		http.Error(w, err.Error(), 500)
-	}
-}
-
 func getFlowFileKey(r *http.Request) string {
 	return r.FormValue("flowFilename")
 }
@@ -165,11 +159,10 @@ func exportFlowFile(r *http.Request) (string, error) {
 	md := hash.Sum(nil)
 	fileName := hex.EncodeToString(md)
 	fileExt := getFlowFileKeyExt(r)
-	filePath := fileName + "." + fileExt
-	mimeType := mime.TypeByExtension("." + fileExt)
+	filePath := fileName + fileExt
+	mimeType := mime.TypeByExtension(fileExt)
 	putError := bucket.Put(filePath, imageBytes, mimeType, s3.PublicRead)
 	if putError != nil {
-		log.Fatal(putError)
 		return "", putError
 	}
 	return bucket.URL(filePath), nil
