@@ -64,6 +64,16 @@ func flowFileExist(r *http.Request) bool {
 	}
 }
 
+func flowFileChunkExist(r *http.Request) bool {
+	if flowFileExist(r) {
+		chunks, _ := getFlowFile(r)
+		_, ok := chunks[r.FormValue("flowChunkNumber")]
+		return ok
+	} else {
+		return false
+	}
+}
+
 func flowFileNumberOfChunks(r *http.Request) int {
 	if chunks, ok := getFlowFile(r); ok {
 		return len(chunks)
@@ -87,7 +97,7 @@ func saveFlowFileChunks(r *http.Request, chunks flowFileChunks) {
 }
 
 func continueUpload(w http.ResponseWriter, r *http.Request) {
-	if flowFileExist(r) {
+	if !flowFileExist(r) || !flowFileChunkExist(r) {
 		w.WriteHeader(404)
 		return
 	}
@@ -120,11 +130,16 @@ func chunkedReader(w http.ResponseWriter, r *http.Request) error {
 			return err
 		}
 		if flowFileNumberOfChunks(r) == cT {
-			fmt.Print("All done")
-			w.Write([]byte("Completed Upload"))
-		} else {
-			fmt.Print("not done yet")
+			url, err := exportFlowFile(r)
+			if err != nil {
+				return err
+			}
+			w.Write([]byte(url))
 		}
 	}
 	return nil
+}
+
+func exportFlowFile(r *http.Request) (string, error) {
+	return "url", nil
 }
