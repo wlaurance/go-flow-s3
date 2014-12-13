@@ -31,7 +31,12 @@ func main() {
 		ExposeHeaders:    []string{"Content-Length"},
 		AllowCredentials: true,
 	}))
-	m.Post("/", streamHandler(chunkedReader))
+	m.Post("/", func(w http.ResponseWriter, r *http.Request) {
+		err := streamHandler(chunkedReader)(w, r)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+	})
 	m.Get("/", continueUpload)
 
 	m.Run()
