@@ -102,6 +102,10 @@ func saveFlowFileChunks(r *http.Request, chunks flowFileChunks) {
 	flowFiles[getFlowFileKey(r)] = chunks
 }
 
+func removeChunksFromMap(r *http.Request) {
+	delete(flowFiles, getFlowFileKey(r))
+}
+
 func continueUpload(w http.ResponseWriter, r *http.Request) {
 	if !flowFileExist(r) || !flowFileChunkExist(r) {
 		w.WriteHeader(404)
@@ -165,6 +169,7 @@ func exportFlowFile(r *http.Request) (string, error) {
 	if putError != nil {
 		return "", putError
 	}
+	removeChunksFromMap(r)
 	return bucket.URL(filePath), nil
 }
 
