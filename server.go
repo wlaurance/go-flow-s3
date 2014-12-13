@@ -11,8 +11,10 @@ import (
 	"github.com/mitchellh/goamz/s3"
 	"io/ioutil"
 	"log"
+	"mime"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strconv"
 )
 
@@ -55,6 +57,10 @@ func (fn streamHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 func getFlowFileKey(r *http.Request) string {
 	return r.FormValue("flowFilename")
+}
+
+func getFlowFileKeyExt(r *http.Request) string {
+	return filepath.Ext(getFlowFileKey(r))
 }
 
 func getFlowFile(r *http.Request) (flowFileChunks, bool) {
@@ -157,14 +163,16 @@ func exportFlowFile(r *http.Request) (string, error) {
 	hash := sha256.New()
 	hash.Write(imageBytes)
 	md := hash.Sum(nil)
-	mdStr := hex.EncodeToString(md)
-	fileName := mdStr + ".jpg"
-	putError := bucket.Put(fileName, imageBytes, "image/jpeg", s3.PublicRead)
+	fileName := hex.EncodeToString(md)
+	fileExt := getFlowFileKeyExt(r)
+	filePath := fileName + "." + fileExt
+	mimeType := mime.TypeByExtension("." + fileExt)
+	putError := bucket.Put(filePath, imageBytes, mimeType, s3.PublicRead)
 	if putError != nil {
 		log.Fatal(putError)
 		return "", putError
 	}
-	return bucket.URL(fileName), nil
+	return bucket.URL(filePath), nil
 }
 
 func getFlowFileBytes(r *http.Request) ([]byte, error) {
