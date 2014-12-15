@@ -23,6 +23,9 @@ GET, PUT, and DELETE permissions for your particular `S3_BUCKET`.
 This micro service is running on a Dokku instance, but could easily be run on a
 Heroku Dyno or your own server.
 
+There is a ENV var that if set, will make this micro service skip uploading the image
+to S3. `SKIP_S3_UPLOAD`.
+
 ###Why?
 
 All of the flow server examples were just examples really and didn't work as intended.

@@ -18,6 +18,8 @@ import (
 	"strconv"
 )
 
+var skipUpload string = os.Getenv("SKIP_S3_UPLOAD")
+
 type flowFileChunks map[string][]byte
 
 var flowFiles map[string]flowFileChunks = make(map[string]flowFileChunks)
@@ -144,7 +146,7 @@ func chunkedReader(w http.ResponseWriter, r *http.Request) error {
 			fmt.Print(err)
 			return err
 		}
-		if flowFileNumberOfChunks(r) == cT {
+		if flowFileNumberOfChunks(r) == cT && skipUpload == "" {
 			url, err := exportFlowFile(r)
 			if err != nil {
 				return err
