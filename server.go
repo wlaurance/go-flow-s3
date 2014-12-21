@@ -9,6 +9,7 @@ import (
 	"github.com/martini-contrib/cors"
 	"github.com/mitchellh/goamz/aws"
 	"github.com/mitchellh/goamz/s3"
+	"github.com/nu7hatch/gouuid"
 	"io/ioutil"
 	"log"
 	"mime"
@@ -33,15 +34,25 @@ func main() {
 		ExposeHeaders:    []string{"Content-Length"},
 		AllowCredentials: true,
 	}))
-	m.Post("/", func(w http.ResponseWriter, r *http.Request) {
-		err := streamHandler(chunkedReader)(w, r)
+	m.Post("/:uuidv4", validateUUID(), func(w http.ResponseWriter, params martini.Params, r *http.Request) {
+		err := streamHandler(chunkedReader)(w, params, r)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
 	})
-	m.Get("/", continueUpload)
+	m.Get("/:uuidv4", validateUUID(), continueUpload)
 
 	m.Run()
+}
+
+func validateUUID() martini.Handler {
+	return func(w http.ResponseWriter, params martini.Params, r *http.Request) {
+		id := params["uuidv4"]
+		_, err := uuid.ParseHex(id)
+		if err != nil {
+			http.Error(w, "Not valid uuidv4", http.StatusBadRequest)
+		}
+	}
 }
 
 type ByChunk []os.FileInfo
@@ -54,10 +65,14 @@ func (a ByChunk) Less(i, j int) bool {
 	return ai < aj
 }
 
-type streamHandler func(http.ResponseWriter, *http.Request) error
+type streamHandler func(http.ResponseWriter, martini.Params, *http.Request) error
 
 func getFlowFileKey(r *http.Request) string {
-	return r.FormValue("flowFilename")
+	return r.FormValue("flowIdentifier")
+}
+
+func getFlowBucket(p martini.Params) string {
+	return p["uuidv4"]
 }
 
 func getFlowFileKeyExt(r *http.Request) string {
@@ -113,14 +128,14 @@ func removeChunksFromMap(r *http.Request) {
 	delete(flowFiles, getFlowFileKey(r))
 }
 
-func continueUpload(w http.ResponseWriter, r *http.Request) {
+func continueUpload(w http.ResponseWriter, params martini.Params, r *http.Request) {
 	if !flowFileExist(r) || !flowFileChunkExist(r) {
 		w.WriteHeader(404)
 		return
 	}
 }
 
-func chunkedReader(w http.ResponseWriter, r *http.Request) error {
+func chunkedReader(w http.ResponseWriter, params martini.Params, r *http.Request) error {
 	r.ParseMultipartForm(25)
 
 	for _, fileHeader := range r.MultipartForm.File["file"] {
