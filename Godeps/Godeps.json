@@ -1,6 +1,6 @@
 {
 	"ImportPath": "github.com/wlaurance/go-flow-s3",
-	"GoVersion": "go1.2.1",
+	"GoVersion": "go1.4",
 	"Deps": [
 		{
 			"ImportPath": "github.com/codegangsta/inject",
@@ -23,6 +23,10 @@
 		{
 			"ImportPath": "github.com/mitchellh/goamz/s3",
 			"Rev": "b2b88cfe3619bb45c4df8670f7130dbfbf82b2cc"
+		},
+		{
+			"ImportPath": "github.com/nu7hatch/gouuid",
+			"Rev": "179d4d0c4d8d407a32af483c2354df1d2c91e6c3"
 		},
 		{
 			"ImportPath": "github.com/vaughan0/go-ini",
