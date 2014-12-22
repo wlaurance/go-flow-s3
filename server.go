@@ -365,6 +365,7 @@ func exportFlowFile(ff *FlowFile, uuidv4 string, r *http.Request) (string, strin
 	fileName := hex.EncodeToString(md)
 	fileExt := ff.FileExtension(r)
 	filePath := fileName + fileExt
+	fullFilePath := fmt.Sprintf("%s/%s", uuidv4, filePath)
 	if skipUpload == "" {
 		auth, err := aws.EnvAuth()
 		if err != nil {
@@ -373,12 +374,12 @@ func exportFlowFile(ff *FlowFile, uuidv4 string, r *http.Request) (string, strin
 		client := s3.New(auth, aws.USEast)
 		bucket := client.Bucket(os.Getenv(s3Bucket))
 		mimeType := mime.TypeByExtension(fileExt)
-		putError := bucket.Put(uuidv4+"/"+filePath, imageBytes, mimeType, s3.PublicRead)
+		putError := bucket.Put(fullFilePath, imageBytes, mimeType, s3.PublicRead)
 		if putError != nil {
 			return "", "", putError
 		}
 		defer ff.Delete()
-		return bucket.URL(filePath), fileName, nil
+		return bucket.URL(fullFilePath), fileName, nil
 	} else {
 		err := writeLocalFileBytes(imageBytes, uuidv4, filePath)
 		if err != nil {
