@@ -77,14 +77,17 @@ func (ff *FlowFile) getBolt() *bolt.DB {
 	return db
 }
 
+func (ff *FlowFile) getChunkNum(r *http.Request) string {
+	return r.FormValue("flowChunkNumber")
+}
+
 func (ff *FlowFile) ChunkExists(r *http.Request) bool {
 	db := ff.getBolt()
 	defer db.Close()
 	err := db.View(func(tx *bolt.Tx) error {
 		bucket := tx.Bucket([]byte(ff.name))
 		if bucket != nil {
-			chunkNum := r.FormValue("flowChunkNumber")
-			chunk := bucket.Get([]byte(chunkNum))
+			chunk := bucket.Get([]byte(ff.getChunkNum(r)))
 			if chunk != nil {
 				return nil
 			}
@@ -92,6 +95,22 @@ func (ff *FlowFile) ChunkExists(r *http.Request) bool {
 		return errors.New("Chunk does not exist")
 	})
 	return err == nil
+}
+
+func (ff *FlowFile) SaveChunkBytes(r *http.Request, chunkBytes []byte) {
+	db := ff.getBolt()
+	defer db.Close()
+	err := db.Update(func(tx *bolt.Tx) error {
+		bucket, err := tx.CreateBucketIfNotExists([]byte(ff.name))
+		if err != nil {
+			return err
+		}
+		err = bucket.Put([]byte(ff.getChunkNum(r)), chunkBytes)
+		return err
+	})
+	if err != nil {
+		panic(err)
+	}
 }
 
 //we can assume that params["uuidv4"] is a valid uuid version 4
@@ -106,6 +125,7 @@ func continueUpload(w http.ResponseWriter, params martini.Params, r *http.Reques
 func chunkedReader(w http.ResponseWriter, params martini.Params, r *http.Request) {
 	r.ParseMultipartForm(25)
 
+	ff := FlowFile{params["uuidv4"]}
 	for _, fileHeader := range r.MultipartForm.File["file"] {
 		src, err := fileHeader.Open()
 		if err != nil {
@@ -113,11 +133,11 @@ func chunkedReader(w http.ResponseWriter, params martini.Params, r *http.Request
 		}
 		defer src.Close()
 
-		bytes, err := ioutil.ReadAll(src)
+		chunkBytes, err := ioutil.ReadAll(src)
 		if err != nil {
 			panic(err.Error())
 		} else {
-			saveChunkBytes(r, bytes)
+			ff.SaveChunkBytes(r, chunkBytes)
 		}
 
 		var chunkTotal = r.FormValue("flowTotalChunks")
