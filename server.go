@@ -151,11 +151,25 @@ func (ff *FlowFile) AssembleChunks() []byte {
 		}
 		return nil
 	})
+	if err != nil {
+		panic(err)
+	}
 	return bytes.Join(chunks, nil)
 }
 
 func (ff *FlowFile) FileExtension(r *http.Request) string {
 	return filepath.Ext(r.FormValue("flowFilename"))
+}
+
+func (ff *FlowFile) Delete() {
+	db := ff.getBolt()
+	defer db.Close()
+	err := db.Update(func(tx *bolt.Tx) error {
+		return tx.DeleteBucket([]byte(ff.name))
+	})
+	if err != nil {
+		panic(err)
+	}
 }
 
 //we can assume that params["uuidv4"] is a valid uuid version 4
