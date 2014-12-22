@@ -208,23 +208,39 @@ func chunkedReader(w http.ResponseWriter, params martini.Params, r *http.Request
 		if err != nil {
 			panic(err.Error())
 		}
-		if ff.NumberOfChunks() == cT && skipUpload == "" {
-			url, err := exportFlowFile(ff, r)
+		if ff.NumberOfChunks() == cT {
+			url, sha, err := exportFlowFile(ff, params["uuidv4"], r)
 			if err != nil {
 				panic(err.Error())
 			}
-			w.Write([]byte(url))
+			if url != "" {
+				w.Write([]byte(url))
+			}
+			go func(url, sha, uuidv4 string) {
+				storeURL(url, sha, uuidv4)
+			}(url, sha, params["uuidv4"])
 		}
 	}
 }
 
-func exportFlowFile(ff *FlowFile, r *http.Request) (string, error) {
-	auth, err := aws.EnvAuth()
+func storeURL(url, sha, uuidv4 string) {
+	db, err := bolt.Open(os.Getenv("BOLT_URLS"), 0600, nil)
 	if err != nil {
-		log.Fatal(err)
+		panic(fmt.Sprintf("Bolt Open Error %s", err.Error()))
 	}
-	client := s3.New(auth, aws.USEast)
-	bucket := client.Bucket(os.Getenv("S3_BUCKET"))
+	err = db.Update(func(tx *bolt.Tx) error {
+		bucket, err := tx.CreateBucketIfNotExists([]byte(uuidv4))
+		if err != nil {
+			return err
+		}
+		return bucket.Put([]byte(sha), []byte(url))
+	})
+	if err != nil {
+		panic(err)
+	}
+}
+
+func exportFlowFile(ff *FlowFile, uuidv4 string, r *http.Request) (string, string, error) {
 	imageBytes := ff.AssembleChunks()
 	hash := sha256.New()
 	hash.Write(imageBytes)
@@ -232,11 +248,21 @@ func exportFlowFile(ff *FlowFile, r *http.Request) (string, error) {
 	fileName := hex.EncodeToString(md)
 	fileExt := ff.FileExtension(r)
 	filePath := fileName + fileExt
-	mimeType := mime.TypeByExtension(fileExt)
-	putError := bucket.Put(filePath, imageBytes, mimeType, s3.PublicRead)
-	if putError != nil {
-		return "", putError
+	if skipUpload == "" {
+		auth, err := aws.EnvAuth()
+		if err != nil {
+			log.Fatal(err)
+		}
+		client := s3.New(auth, aws.USEast)
+		bucket := client.Bucket(os.Getenv("S3_BUCKET"))
+		mimeType := mime.TypeByExtension(fileExt)
+		putError := bucket.Put(filePath, imageBytes, mimeType, s3.PublicRead)
+		if putError != nil {
+			return "", "", putError
+		}
+		defer ff.Delete()
+		return bucket.URL(filePath), fileName, nil
+	} else {
+		return fmt.Sprintf("%s/%s/%s", os.Getenv("BASE_PATH"), uuidv4, filePath), fileName, nil
 	}
-	defer ff.Delete()
-	return bucket.URL(filePath), nil
 }
