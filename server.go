@@ -17,6 +17,7 @@ import (
 	"mime"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strconv"
 )
 
@@ -151,6 +152,10 @@ func (ff *FlowFile) AssembleChunks() []byte {
 		return nil
 	})
 	return bytes.Join(chunks, nil)
+}
+
+func (ff *FlowFile) FileExtension(r *http.Request) string {
+	return filepath.Ext(r.FormValue("flowFilename"))
 }
 
 //we can assume that params["uuidv4"] is a valid uuid version 4
