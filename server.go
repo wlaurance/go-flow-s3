@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
@@ -132,6 +133,26 @@ func (ff *FlowFile) NumberOfChunks() int {
 	return numKeys
 }
 
+func (ff *FlowFile) AssembleChunks() []byte {
+	numChunks := ff.NumberOfChunks()
+	chunks := make([][]byte, numChunks, numChunks)
+	db := ff.getBolt()
+	defer db.Close()
+	err := db.View(func(tx *bolt.Tx) error {
+		bucket := tx.Bucket([]byte(ff.name))
+		if bucket != nil {
+			cursor := bucket.Cursor()
+			i := 0
+			for k, v := cursor.First(); k != nil; k, v = cursor.Next() {
+				chunks[i] = v
+				i = i + 1
+			}
+		}
+		return nil
+	})
+	return bytes.Join(chunks, nil)
+}
+
 //we can assume that params["uuidv4"] is a valid uuid version 4
 func continueUpload(w http.ResponseWriter, params martini.Params, r *http.Request) {
 	ff := createFlowFile(params, r)
@@ -166,7 +187,7 @@ func chunkedReader(w http.ResponseWriter, params martini.Params, r *http.Request
 			panic(err.Error())
 		}
 		if ff.NumberOfChunks() == cT && skipUpload == "" {
-			url, err := exportFlowFile(r)
+			url, err := exportFlowFile(ff, r)
 			if err != nil {
 				panic(err.Error())
 			}
@@ -175,37 +196,25 @@ func chunkedReader(w http.ResponseWriter, params martini.Params, r *http.Request
 	}
 }
 
-func exportFlowFile(r *http.Request) (string, error) {
+func exportFlowFile(ff *FlowFile, r *http.Request) (string, error) {
 	auth, err := aws.EnvAuth()
 	if err != nil {
 		log.Fatal(err)
 	}
 	client := s3.New(auth, aws.USEast)
 	bucket := client.Bucket(os.Getenv("S3_BUCKET"))
-	imageBytes, err := getFlowFileBytes(r)
+	imageBytes := ff.AssembleChunks()
 	hash := sha256.New()
 	hash.Write(imageBytes)
 	md := hash.Sum(nil)
 	fileName := hex.EncodeToString(md)
-	fileExt := getFlowFileKeyExt(r)
+	fileExt := ff.FileExtension(r)
 	filePath := fileName + fileExt
 	mimeType := mime.TypeByExtension(fileExt)
 	putError := bucket.Put(filePath, imageBytes, mimeType, s3.PublicRead)
 	if putError != nil {
 		return "", putError
 	}
-	removeChunksFromMap(r)
+	defer ff.Delete()
 	return bucket.URL(filePath), nil
-}
-
-func getFlowFileBytes(r *http.Request) ([]byte, error) {
-	chunks, ok := getFlowFile(r)
-	if ok {
-		image := make([]byte, 0)
-		for _, chunk := range chunks {
-			image = append(image, chunk...)
-		}
-		return image, nil
-	}
-	return nil, errors.New("Image bytes not found")
 }
