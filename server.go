@@ -113,6 +113,21 @@ func (ff *FlowFile) SaveChunkBytes(r *http.Request, chunkBytes []byte) {
 	}
 }
 
+func (ff *FlowFile) NumberOfChunks() int {
+	db := ff.getBolt()
+	defer db.Close()
+	var numKeys int
+	err := db.View(func(tx *bolt.Tx) error {
+		bucket := tx.Bucket([]byte(ff.name))
+		if bucket != nil {
+			stats := bucket.Stats()
+			numKeys = stats.KeyN
+		}
+		return nil
+	})
+	return numKeys
+}
+
 //we can assume that params["uuidv4"] is a valid uuid version 4
 func continueUpload(w http.ResponseWriter, params martini.Params, r *http.Request) {
 	ff := FlowFile{params["uuidv4"]}
@@ -146,7 +161,7 @@ func chunkedReader(w http.ResponseWriter, params martini.Params, r *http.Request
 		if err != nil {
 			panic(err.Error())
 		}
-		if flowFileNumberOfChunks(r) == cT && skipUpload == "" {
+		if ff.NumberOfChunks() == cT && skipUpload == "" {
 			url, err := exportFlowFile(r)
 			if err != nil {
 				panic(err.Error())
