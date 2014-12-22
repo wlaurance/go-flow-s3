@@ -23,8 +23,17 @@ GET, PUT, and DELETE permissions for your particular `S3_BUCKET`.
 This micro service is running on a Dokku instance, but could easily be run on a
 Heroku Dyno or your own server.
 
-There is a ENV var that if set, will make this micro service skip uploading the image
-to S3. `SKIP_S3_UPLOAD`.
+**If** `SKIP_S3_UPLOAD` is a truthy value, images will not be put into your S3 bucket.
+Behind the scenes, this service is using [boltdb](https://github.com/boltdb/bolt) which
+is a low level key value store that uses files. This service uses three different bolt
+databases. You must define four environment variables, each indicating where you
+want the particular database file. Make sure the directories exist, but the actual
+file doesn't have to. The Bolt client will create the file if necessary.
+
+* `BOLT_IMAGES` - Local Image Storage
+* `BOLT_URLS` - Local Url lists
+* `BOLT_CHUNKS` - Temporary chunks for flow files
+* `BASE_PATH` - host you are running on `http://localhost:3000`
 
 ###Why?
 

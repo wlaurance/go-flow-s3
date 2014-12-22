@@ -26,17 +26,23 @@ var skipUpload string = os.Getenv("SKIP_S3_UPLOAD")
 var boltImages string = "BOLT_IMAGES"
 var boltUrls string = "BOLT_URLS"
 var boltChunks string = "BOLT_CHUNKS"
+var basePath string = "BASE_PATH"
+
+var s3Bucket string = "S3_BUCKET"
 
 func init() {
 	if skipUpload != "" {
-		bImages, bUrls, bChunks := os.Getenv(boltImages), os.Getenv(boltUrls), os.Getenv(boltChunks)
-		if bImages == "" || bUrls == "" || bChunks == "" {
-			log.Fatal(fmt.Sprintf("Please define %s %s %s in your environment.", boltImages, boltUrls, boltChunks))
+		bImages, bUrls, bChunks, bPath := os.Getenv(boltImages), os.Getenv(boltUrls), os.Getenv(boltChunks), os.Getenv(basePath)
+		if bImages == "" || bUrls == "" || bChunks == "" || bPath == "" {
+			log.Fatal(fmt.Sprintf("Please define %s %s %s %s in your environment.", boltImages, boltUrls, boltChunks, basePath))
 		}
 	} else {
 		_, err := aws.EnvAuth()
 		if err != nil {
 			log.Fatal(err)
+		}
+		if os.Getenv(s3Bucket) == "" {
+			log.Fatal(fmt.Sprintf("Please define a S3 bucket with %s", s3Bucket))
 		}
 	}
 }
@@ -365,7 +371,7 @@ func exportFlowFile(ff *FlowFile, uuidv4 string, r *http.Request) (string, strin
 			log.Fatal(err)
 		}
 		client := s3.New(auth, aws.USEast)
-		bucket := client.Bucket(os.Getenv("S3_BUCKET"))
+		bucket := client.Bucket(os.Getenv(s3Bucket))
 		mimeType := mime.TypeByExtension(fileExt)
 		putError := bucket.Put(filePath, imageBytes, mimeType, s3.PublicRead)
 		if putError != nil {
@@ -378,6 +384,6 @@ func exportFlowFile(ff *FlowFile, uuidv4 string, r *http.Request) (string, strin
 		if err != nil {
 			return "", "", err
 		}
-		return fmt.Sprintf("%s/%s/%s", os.Getenv("BASE_PATH"), uuidv4, filePath), fileName, nil
+		return fmt.Sprintf("%s/%s/%s", os.Getenv(basePath), uuidv4, filePath), fileName, nil
 	}
 }
