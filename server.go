@@ -33,6 +33,11 @@ func init() {
 		if bImages == "" || bUrls == "" || bChunks == "" {
 			log.Fatal(fmt.Sprintf("Please define %s %s %s in your environment.", boltImages, boltUrls, boltChunks))
 		}
+	} else {
+		_, err := aws.EnvAuth()
+		if err != nil {
+			log.Fatal(err)
+		}
 	}
 }
 
