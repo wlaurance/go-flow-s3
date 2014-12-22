@@ -23,6 +23,18 @@ import (
 )
 
 var skipUpload string = os.Getenv("SKIP_S3_UPLOAD")
+var boltImages string = "BOLT_IMAGES"
+var boltUrls string = "BOLT_URLS"
+var boltChunks string = "BOLT_CHUNKS"
+
+func init() {
+	if skipUpload != "" {
+		bImages, bUrls, bChunks := os.Getenv(boltImages), os.Getenv(boltUrls), os.Getenv(boltChunks)
+		if bImages == "" || bUrls == "" || bChunks == "" {
+			log.Fatal(fmt.Sprintf("Please define %s %s %s in your environment.", boltImages, boltUrls, boltChunks))
+		}
+	}
+}
 
 func main() {
 	m := martini.Classic()
@@ -105,7 +117,7 @@ func createFlowFile(params martini.Params, r *http.Request) *FlowFile {
 }
 
 func (ff *FlowFile) getBolt() *bolt.DB {
-	db, err := bolt.Open(os.Getenv("BOLT_CHUNKS"), 0600, nil)
+	db, err := bolt.Open(os.Getenv(boltChunks), 0600, nil)
 	if err != nil {
 		panic(fmt.Sprintf("Bolt Open Error %s", err.Error()))
 	}
@@ -253,7 +265,7 @@ func chunkedReader(w http.ResponseWriter, params martini.Params, r *http.Request
 }
 
 func storeURL(url, sha, uuidv4 string) {
-	db, err := bolt.Open(os.Getenv("BOLT_URLS"), 0600, nil)
+	db, err := bolt.Open(os.Getenv(boltUrls), 0600, nil)
 	if err != nil {
 		panic(fmt.Sprintf("Bolt Open Error %s", err.Error()))
 	}
@@ -271,7 +283,7 @@ func storeURL(url, sha, uuidv4 string) {
 }
 
 func getBucketUrls(uuidv4 string) []string {
-	db, err := bolt.Open(os.Getenv("BOLT_URLS"), 0600, nil)
+	db, err := bolt.Open(os.Getenv(boltUrls), 0600, nil)
 	if err != nil {
 		panic(fmt.Sprintf("Bolt Open Error %s", err.Error()))
 	}
@@ -297,14 +309,14 @@ func getBucketUrls(uuidv4 string) []string {
 
 func getLocalImage(params martini.Params, w http.ResponseWriter) {
 	uuidv4, fileName := params["uuidv4"], params["fileName"]
-	db, err := bolt.Open(os.Getenv("BOLT_LOCAL_IMAGES"), 0600, nil)
+	db, err := bolt.Open(os.Getenv(boltImages), 0600, nil)
 	if err != nil {
 		panic(fmt.Sprintf("Bolt Open Error %s", err.Error()))
 	}
 	defer db.Close()
 	var imageBytes []byte
 	db.View(func(tx *bolt.Tx) error {
-		bucket := tx.Bucket([]byte("BOLT_LOCAL_IMAGES"))
+		bucket := tx.Bucket([]byte(boltImages))
 		if bucket != nil {
 			imageBytes = bucket.Get([]byte(fmt.Sprintf("%s%s", uuidv4, fileName)))
 		}
