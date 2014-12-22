@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"github.com/boltdb/bolt"
 	"github.com/go-martini/martini"
 	"github.com/martini-contrib/cors"
 	"github.com/mitchellh/goamz/aws"
@@ -15,15 +16,10 @@ import (
 	"mime"
 	"net/http"
 	"os"
-	"path/filepath"
 	"strconv"
 )
 
 var skipUpload string = os.Getenv("SKIP_S3_UPLOAD")
-
-type flowFileChunks map[string][]byte
-
-var flowFiles map[string]flowFileChunks = make(map[string]flowFileChunks)
 
 func main() {
 	m := martini.Classic()
@@ -35,10 +31,12 @@ func main() {
 		AllowCredentials: true,
 	}))
 	m.Post("/:uuidv4", validateUUID(), func(w http.ResponseWriter, params martini.Params, r *http.Request) {
-		err := streamHandler(chunkedReader)(w, params, r)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-		}
+		defer func() {
+			if r := recover(); r != nil {
+				fmt.Println("Recovered in Post", r)
+			}
+		}()
+		streamHandler(chunkedReader)(w, params, r)
 	})
 	m.Get("/:uuidv4", validateUUID(), continueUpload)
 
@@ -65,91 +63,59 @@ func (a ByChunk) Less(i, j int) bool {
 	return ai < aj
 }
 
-type streamHandler func(http.ResponseWriter, martini.Params, *http.Request) error
+type streamHandler func(http.ResponseWriter, martini.Params, *http.Request)
 
-func getFlowFileKey(r *http.Request) string {
-	return r.FormValue("flowIdentifier")
+type FlowFile struct {
+	name string
 }
 
-func getFlowBucket(p martini.Params) string {
-	return p["uuidv4"]
-}
-
-func getFlowFileKeyExt(r *http.Request) string {
-	return filepath.Ext(getFlowFileKey(r))
-}
-
-func getFlowFile(r *http.Request) (flowFileChunks, bool) {
-	chunks, ok := flowFiles[getFlowFileKey(r)]
-	return chunks, ok
-}
-
-func flowFileExist(r *http.Request) bool {
-	if _, ok := getFlowFile(r); ok {
-		return ok
-	} else {
-		return !ok
+func (ff *FlowFile) getBolt() *bolt.DB {
+	db, err := bolt.Open(os.Getenv("BOLT_IMAGES"), 0600, nil)
+	if err != nil {
+		panic(fmt.Sprintf("Bolt Open Error %s", err.Error()))
 	}
+	return db
 }
 
-func flowFileChunkExist(r *http.Request) bool {
-	if flowFileExist(r) {
-		chunks, _ := getFlowFile(r)
-		_, ok := chunks[r.FormValue("flowChunkNumber")]
-		return ok
-	} else {
-		return false
-	}
+func (ff *FlowFile) ChunkExists(r *http.Request) bool {
+	db := ff.getBolt()
+	defer db.Close()
+	err := db.View(func(tx *bolt.Tx) error {
+		bucket := tx.Bucket([]byte(ff.name))
+		if bucket != nil {
+			chunkNum := r.FormValue("flowChunkNumber")
+			chunk := bucket.Get([]byte(chunkNum))
+			if chunk != nil {
+				return nil
+			}
+		}
+		return errors.New("Chunk does not exist")
+	})
+	return err == nil
 }
 
-func flowFileNumberOfChunks(r *http.Request) int {
-	if chunks, ok := getFlowFile(r); ok {
-		return len(chunks)
-	} else {
-		return 0
-	}
-}
-
-func saveChunkBytes(r *http.Request, bytes []byte) {
-	if chunks, ok := getFlowFile(r); ok {
-		chunks[r.FormValue("flowChunkNumber")] = bytes
-		saveFlowFileChunks(r, chunks)
-	} else {
-		flowFiles[getFlowFileKey(r)] = make(flowFileChunks)
-		flowFiles[getFlowFileKey(r)][r.FormValue("flowChunkNumber")] = bytes
-	}
-}
-
-func saveFlowFileChunks(r *http.Request, chunks flowFileChunks) {
-	flowFiles[getFlowFileKey(r)] = chunks
-}
-
-func removeChunksFromMap(r *http.Request) {
-	delete(flowFiles, getFlowFileKey(r))
-}
-
+//we can assume that params["uuidv4"] is a valid uuid version 4
 func continueUpload(w http.ResponseWriter, params martini.Params, r *http.Request) {
-	if !flowFileExist(r) || !flowFileChunkExist(r) {
+	ff := FlowFile{params["uuidv4"]}
+	if !ff.ChunkExists(r) {
 		w.WriteHeader(404)
 		return
 	}
 }
 
-func chunkedReader(w http.ResponseWriter, params martini.Params, r *http.Request) error {
+func chunkedReader(w http.ResponseWriter, params martini.Params, r *http.Request) {
 	r.ParseMultipartForm(25)
 
 	for _, fileHeader := range r.MultipartForm.File["file"] {
 		src, err := fileHeader.Open()
 		if err != nil {
-			fmt.Print(err)
-			return err
+			panic(err.Error())
 		}
 		defer src.Close()
 
 		bytes, err := ioutil.ReadAll(src)
 		if err != nil {
-			fmt.Print(err)
-			return err
+			panic(err.Error())
 		} else {
 			saveChunkBytes(r, bytes)
 		}
@@ -158,18 +124,16 @@ func chunkedReader(w http.ResponseWriter, params martini.Params, r *http.Request
 
 		cT, err := strconv.Atoi(chunkTotal)
 		if err != nil {
-			fmt.Print(err)
-			return err
+			panic(err.Error())
 		}
 		if flowFileNumberOfChunks(r) == cT && skipUpload == "" {
 			url, err := exportFlowFile(r)
 			if err != nil {
-				return err
+				panic(err.Error())
 			}
 			w.Write([]byte(url))
 		}
 	}
-	return nil
 }
 
 func exportFlowFile(r *http.Request) (string, error) {
