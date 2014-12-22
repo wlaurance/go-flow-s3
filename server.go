@@ -42,6 +42,17 @@ func main() {
 	})
 	m.Get("/:uuidv4", validateUUID(), continueUpload)
 
+	if skipUpload != "" {
+		m.Get("/:uuidv4/:fileName", validateUUID(), func(params martini.Params, w http.ResponseWriter) {
+			defer func() {
+				if r := recover(); r != nil {
+					fmt.Println("Recovered in local file retrievel", r)
+				}
+			}()
+			getLocalImage(params, w)
+		})
+	}
+
 	m.Run()
 }
 
@@ -76,7 +87,7 @@ func createFlowFile(params martini.Params, r *http.Request) *FlowFile {
 }
 
 func (ff *FlowFile) getBolt() *bolt.DB {
-	db, err := bolt.Open(os.Getenv("BOLT_IMAGES"), 0600, nil)
+	db, err := bolt.Open(os.Getenv("BOLT_CHUNKS"), 0600, nil)
 	if err != nil {
 		panic(fmt.Sprintf("Bolt Open Error %s", err.Error()))
 	}
@@ -240,6 +251,45 @@ func storeURL(url, sha, uuidv4 string) {
 	}
 }
 
+func getLocalImage(params martini.Params, w http.ResponseWriter) {
+	uuidv4, fileName := params["uuidv4"], params["fileName"]
+	db, err := bolt.Open(os.Getenv("BOLT_LOCAL_IMAGES"), 0600, nil)
+	if err != nil {
+		panic(fmt.Sprintf("Bolt Open Error %s", err.Error()))
+	}
+	defer db.Close()
+	var imageBytes []byte
+	db.View(func(tx *bolt.Tx) error {
+		bucket := tx.Bucket([]byte("BOLT_LOCAL_IMAGES"))
+		if bucket != nil {
+			imageBytes = bucket.Get([]byte(fmt.Sprintf("%s%s", uuidv4, fileName)))
+		}
+		return nil
+	})
+	if imageBytes == nil {
+		http.Error(w, "Image not found", http.StatusNotFound)
+	} else {
+		w.Header().Set("Content-Type", mime.TypeByExtension(filepath.Ext(fileName)))
+		w.Write(imageBytes)
+	}
+}
+
+func writeLocalFileBytes(imageBytes []byte, uuidv4 string, filePath string) error {
+	db, err := bolt.Open(os.Getenv("BOLT_LOCAL_IMAGES"), 0600, nil)
+	if err != nil {
+		panic(fmt.Sprintf("Bolt Open Error %s", err.Error()))
+	}
+	defer db.Close()
+	err = db.Update(func(tx *bolt.Tx) error {
+		bucket, err := tx.CreateBucketIfNotExists([]byte("BOLT_LOCAL_IMAGES"))
+		if err != nil {
+			return err
+		}
+		return bucket.Put([]byte(fmt.Sprintf("%s%s", uuidv4, filePath)), imageBytes)
+	})
+	return err
+}
+
 func exportFlowFile(ff *FlowFile, uuidv4 string, r *http.Request) (string, string, error) {
 	imageBytes := ff.AssembleChunks()
 	hash := sha256.New()
@@ -263,6 +313,10 @@ func exportFlowFile(ff *FlowFile, uuidv4 string, r *http.Request) (string, strin
 		defer ff.Delete()
 		return bucket.URL(filePath), fileName, nil
 	} else {
+		err := writeLocalFileBytes(imageBytes, uuidv4, filePath)
+		if err != nil {
+			return "", "", err
+		}
 		return fmt.Sprintf("%s/%s/%s", os.Getenv("BASE_PATH"), uuidv4, filePath), fileName, nil
 	}
 }
