@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/boltdb/bolt"
@@ -41,6 +42,23 @@ func main() {
 		streamHandler(chunkedReader)(w, params, r)
 	})
 	m.Get("/:uuidv4", validateUUID(), continueUpload)
+
+	m.Get("/:uuidv4/urls", validateUUID(), func(params martini.Params, w http.ResponseWriter) {
+		defer func() {
+			if r := recover(); r != nil {
+				fmt.Println("Recovered in local file retrievel", r)
+			}
+		}()
+		var urls []string
+		urls = getBucketUrls(params["uuidv4"])
+		if len(urls) == 0 {
+			http.Error(w, "Buckets urls not found", http.StatusNotFound)
+		} else {
+			w.Header().Set("Content-Type", "application/json")
+			list, _ := json.Marshal(urls)
+			w.Write(list)
+		}
+	})
 
 	if skipUpload != "" {
 		m.Get("/:uuidv4/:fileName", validateUUID(), func(params martini.Params, w http.ResponseWriter) {
@@ -239,6 +257,7 @@ func storeURL(url, sha, uuidv4 string) {
 	if err != nil {
 		panic(fmt.Sprintf("Bolt Open Error %s", err.Error()))
 	}
+	defer db.Close()
 	err = db.Update(func(tx *bolt.Tx) error {
 		bucket, err := tx.CreateBucketIfNotExists([]byte(uuidv4))
 		if err != nil {
@@ -249,6 +268,31 @@ func storeURL(url, sha, uuidv4 string) {
 	if err != nil {
 		panic(err)
 	}
+}
+
+func getBucketUrls(uuidv4 string) []string {
+	db, err := bolt.Open(os.Getenv("BOLT_URLS"), 0600, nil)
+	if err != nil {
+		panic(fmt.Sprintf("Bolt Open Error %s", err.Error()))
+	}
+	defer db.Close()
+	var urls []string
+	err = db.View(func(tx *bolt.Tx) error {
+		bucket := tx.Bucket([]byte(uuidv4))
+		if bucket == nil {
+			return nil
+		}
+		c := bucket.Cursor()
+		for k, url := c.First(); k != nil; k, url = c.Next() {
+			urls = append(urls, string(url))
+		}
+		return nil
+	})
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println(urls)
+	return urls
 }
 
 func getLocalImage(params martini.Params, w http.ResponseWriter) {
