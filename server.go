@@ -209,16 +209,16 @@ func chunkedReader(w http.ResponseWriter, params martini.Params, r *http.Request
 			panic(err.Error())
 		}
 		if ff.NumberOfChunks() == cT {
-			url, sha, err := exportFlowFile(ff, params["uuidv4"], r)
+			url, filePath, err := exportFlowFile(ff, params["uuidv4"], r)
 			if err != nil {
 				panic(err.Error())
 			}
 			if url != "" {
 				w.Write([]byte(url))
 			}
-			go func(url, sha, uuidv4 string) {
-				storeURL(url, sha, uuidv4)
-			}(url, sha, params["uuidv4"])
+			go func(url, filePath, uuidv4 string) {
+				storeURL(url, filePath, uuidv4)
+			}(url, filePath, params["uuidv4"])
 		}
 	}
 }
