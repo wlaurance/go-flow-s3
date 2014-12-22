@@ -69,6 +69,10 @@ type FlowFile struct {
 	name string
 }
 
+func createFlowFile(params martini.Params, r *http.Request) *FlowFile {
+	return &FlowFile{params["uuidv4"] + r.FormValue("flowIdentifier")}
+}
+
 func (ff *FlowFile) getBolt() *bolt.DB {
 	db, err := bolt.Open(os.Getenv("BOLT_IMAGES"), 0600, nil)
 	if err != nil {
@@ -130,7 +134,7 @@ func (ff *FlowFile) NumberOfChunks() int {
 
 //we can assume that params["uuidv4"] is a valid uuid version 4
 func continueUpload(w http.ResponseWriter, params martini.Params, r *http.Request) {
-	ff := FlowFile{params["uuidv4"]}
+	ff := createFlowFile(params, r)
 	if !ff.ChunkExists(r) {
 		w.WriteHeader(404)
 		return
@@ -140,7 +144,7 @@ func continueUpload(w http.ResponseWriter, params martini.Params, r *http.Reques
 func chunkedReader(w http.ResponseWriter, params martini.Params, r *http.Request) {
 	r.ParseMultipartForm(25)
 
-	ff := FlowFile{params["uuidv4"]}
+	ff := createFlowFile(params, r)
 	for _, fileHeader := range r.MultipartForm.File["file"] {
 		src, err := fileHeader.Open()
 		if err != nil {
