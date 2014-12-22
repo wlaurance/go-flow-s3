@@ -131,6 +131,9 @@ func (ff *FlowFile) NumberOfChunks() int {
 		}
 		return nil
 	})
+	if err != nil {
+		panic(err)
+	}
 	return numKeys
 }
 
