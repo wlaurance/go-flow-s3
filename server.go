@@ -373,7 +373,7 @@ func exportFlowFile(ff *FlowFile, uuidv4 string, r *http.Request) (string, strin
 		client := s3.New(auth, aws.USEast)
 		bucket := client.Bucket(os.Getenv(s3Bucket))
 		mimeType := mime.TypeByExtension(fileExt)
-		putError := bucket.Put(filePath, imageBytes, mimeType, s3.PublicRead)
+		putError := bucket.Put(uuidv4+"/"+filePath, imageBytes, mimeType, s3.PublicRead)
 		if putError != nil {
 			return "", "", putError
 		}
