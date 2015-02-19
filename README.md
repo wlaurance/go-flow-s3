@@ -23,17 +23,14 @@ GET, PUT, and DELETE permissions for your particular `S3_BUCKET`.
 This micro service is running on a Dokku instance, but could easily be run on a
 Heroku Dyno or your own server.
 
-**If** `SKIP_S3_UPLOAD` is a truthy value, images will not be put into your S3 bucket.
-Behind the scenes, this service is using [boltdb](https://github.com/boltdb/bolt) which
-is a low level key value store that uses files. This service uses three different bolt
-databases. You must define four environment variables, each indicating where you
-want the particular database file. Make sure the directories exist, but the actual
-file doesn't have to. The Bolt client will create the file if necessary.
+####Postgres
 
-* `BOLT_IMAGES` - Local Image Storage
-* `BOLT_URLS` - Local Url lists
-* `BOLT_CHUNKS` - Temporary chunks for flow files
-* `BASE_PATH` - host you are running on `http://localhost:3000`
+* `IMAGES_POSTGRESQL_DATABASE_STRING`
+
+Add a postgresql connection string to your environment. The server will expect there
+to be a table named "vault" with two columns (uuid, url). Provided is a sql script
+for you to run. You need the uuid extension as well. Since this is as complicated
+as this will ever get, we do not need a migration framework.
 
 ###Why?
 
