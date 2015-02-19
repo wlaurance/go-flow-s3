@@ -131,9 +131,7 @@ func chunkedReader(w http.ResponseWriter, params martini.Params, r *http.Request
 			if url != "" {
 				w.Write([]byte(url))
 			}
-			go func(url, uuidv4 string) {
-				storeURL(url, uuidv4)
-			}(url, params["uuidv4"])
+			storeURL(url, params["uuidv4"])
 		}
 	}
 }
