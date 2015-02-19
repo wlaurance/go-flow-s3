@@ -148,7 +148,11 @@ func getDB() *sql.DB {
 }
 
 func storeURL(url, uuidv4 string) {
-	//TODO Store
+	db := getDB()
+	_, err := db.Query("insert into vault (uuid, url) values ('$1', '$2')", uuidv4, url)
+	if err != nil {
+		panic(err.Error())
+	}
 }
 
 func getBucketUrls(uuidv4 string) []string {
