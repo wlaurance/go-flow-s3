@@ -25,7 +25,7 @@ var s3Bucket string = "S3_BUCKET"
 
 func init() {
 	bChunks := os.Getenv(boltChunks)
-	if bChunks == "" || bPath == "" {
+	if bChunks == "" {
 		log.Fatal(fmt.Sprintf("Please define %s in your environment.", boltChunks))
 	}
 	_, err := aws.EnvAuth()
@@ -84,16 +84,6 @@ func validateUUID() martini.Handler {
 			http.Error(w, "Not valid uuidv4", http.StatusBadRequest)
 		}
 	}
-}
-
-type ByChunk []os.FileInfo
-
-func (a ByChunk) Len() int      { return len(a) }
-func (a ByChunk) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
-func (a ByChunk) Less(i, j int) bool {
-	ai, _ := strconv.Atoi(a[i].Name())
-	aj, _ := strconv.Atoi(a[j].Name())
-	return ai < aj
 }
 
 type streamHandler func(http.ResponseWriter, martini.Params, *http.Request)
