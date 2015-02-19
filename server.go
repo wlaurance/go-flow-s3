@@ -5,7 +5,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"github.com/boltdb/bolt"
 	"github.com/go-martini/martini"
 	"github.com/martini-contrib/cors"
 	"github.com/mitchellh/goamz/aws"
@@ -16,7 +15,6 @@ import (
 	"mime"
 	"net/http"
 	"os"
-	"path/filepath"
 	"strconv"
 )
 
@@ -150,25 +148,10 @@ func chunkedReader(w http.ResponseWriter, params martini.Params, r *http.Request
 }
 
 func storeURL(url, sha, uuidv4 string) {
-	db, err := bolt.Open(os.Getenv(boltUrls), 0600, nil)
-	if err != nil {
-		panic(fmt.Sprintf("Bolt Open Error %s", err.Error()))
-	}
-	defer db.Close()
-	err = db.Update(func(tx *bolt.Tx) error {
-		bucket, err := tx.CreateBucketIfNotExists([]byte(uuidv4))
-		if err != nil {
-			return err
-		}
-		return bucket.Put([]byte(sha), []byte(url))
-	})
-	if err != nil {
-		panic(err)
-	}
 }
 
 func getBucketUrls(uuidv4 string) []string {
-	return []string("hey")
+	return []string{"hey"}
 }
 
 func exportFlowFile(ff *FlowFile, uuidv4 string, r *http.Request) (string, string, error) {
