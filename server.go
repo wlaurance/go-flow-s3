@@ -2,10 +2,12 @@ package main
 
 import (
 	"crypto/sha256"
+	"database/sql"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"github.com/go-martini/martini"
+	_ "github.com/lib/pq"
 	"github.com/martini-contrib/cors"
 	"github.com/mitchellh/goamz/aws"
 	"github.com/mitchellh/goamz/s3"
@@ -122,28 +124,38 @@ func chunkedReader(w http.ResponseWriter, params martini.Params, r *http.Request
 			panic(err.Error())
 		}
 		if ff.NumberOfChunks() == cT {
-			url, filePath, err := exportFlowFile(ff, params["uuidv4"], r)
+			url, err := exportFlowFile(ff, params["uuidv4"], r)
 			if err != nil {
 				panic(err.Error())
 			}
 			if url != "" {
 				w.Write([]byte(url))
 			}
-			go func(url, filePath, uuidv4 string) {
-				storeURL(url, filePath, uuidv4)
-			}(url, filePath, params["uuidv4"])
+			go func(url, uuidv4 string) {
+				storeURL(url, uuidv4)
+			}(url, params["uuidv4"])
 		}
 	}
 }
 
-func storeURL(url, sha, uuidv4 string) {
+func getDB() *sql.DB {
+	connstring := os.Getenv("IMAGES_POSTGRESQL_DATABASE_STRING")
+	db, err := sql.Open("postgres", connstring)
+	if err != nil {
+		panic(err.Error())
+	}
+	return db
+}
+
+func storeURL(url, uuidv4 string) {
+	//TODO Store
 }
 
 func getBucketUrls(uuidv4 string) []string {
 	return []string{"hey"}
 }
 
-func exportFlowFile(ff *FlowFile, uuidv4 string, r *http.Request) (string, string, error) {
+func exportFlowFile(ff *FlowFile, uuidv4 string, r *http.Request) (string, error) {
 	imageBytes := ff.AssembleChunks()
 	hash := sha256.New()
 	hash.Write(imageBytes)
@@ -161,8 +173,8 @@ func exportFlowFile(ff *FlowFile, uuidv4 string, r *http.Request) (string, strin
 	mimeType := mime.TypeByExtension(fileExt)
 	putError := bucket.Put(fullFilePath, imageBytes, mimeType, s3.PublicRead)
 	if putError != nil {
-		return "", "", putError
+		return "", putError
 	}
 	defer ff.Delete()
-	return bucket.URL(fullFilePath), fileName, nil
+	return bucket.URL(fullFilePath), nil
 }
