@@ -152,7 +152,18 @@ func storeURL(url, uuidv4 string) {
 }
 
 func getBucketUrls(uuidv4 string) []string {
-	return []string{"hey"}
+	db := getDB()
+	rows, err := db.Query("select url from vault where uuid = $1", uuidv4)
+	if err != nil {
+		panic(err.Error())
+	}
+	var urls []string
+	for rows.Next() {
+		var s string
+		rows.Scan(&s)
+		urls = append(urls, s)
+	}
+	return urls
 }
 
 func exportFlowFile(ff *FlowFile, uuidv4 string, r *http.Request) (string, error) {
