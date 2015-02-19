@@ -20,14 +20,13 @@ import (
 
 var skipUpload string = os.Getenv("SKIP_S3_UPLOAD")
 var boltChunks string = "BOLT_CHUNKS"
-var basePath string = "BASE_PATH"
 
 var s3Bucket string = "S3_BUCKET"
 
 func init() {
-	bChunks, bPath := os.Getenv(boltChunks), os.Getenv(basePath)
+	bChunks := os.Getenv(boltChunks)
 	if bChunks == "" || bPath == "" {
-		log.Fatal(fmt.Sprintf("Please define %s %s in your environment.", boltChunks, basePath))
+		log.Fatal(fmt.Sprintf("Please define %s in your environment.", boltChunks))
 	}
 	_, err := aws.EnvAuth()
 	if err != nil {
