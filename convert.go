@@ -11,6 +11,9 @@ func ConvertToJpegFromPng(b []byte) []byte {
 	nr := bytes.NewReader(b)
 	buff := new(bytes.Buffer)
 	img, err := png.Decode(nr)
+	if err != nil {
+		panic(err)
+	}
 	var rgba *image.RGBA
 	if nrgba, ok := img.(*image.NRGBA); ok {
 		if nrgba.Opaque() {

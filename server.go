@@ -173,7 +173,7 @@ func exportFlowFile(ff *FlowFile, uuidv4 string, r *http.Request) (string, error
 	fileExt := ff.FileExtension(r)
 	var imageBytes []byte
 	if fileExt == ".png" {
-		imageBytes = ConvertToJpegFromPng(imageBytes)
+		imageBytes = ConvertToJpegFromPng(imageRawBytes)
 		fileExt = ".jpeg"
 	} else {
 		imageBytes = imageRawBytes
