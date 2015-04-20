@@ -169,12 +169,18 @@ func getBucketUrls(uuidv4 string) []string {
 }
 
 func exportFlowFile(ff *FlowFile, uuidv4 string, r *http.Request) (string, error) {
-	imageBytes := ff.AssembleChunks()
+	imageRawBytes := ff.AssembleChunks()
+	fileExt := ff.FileExtension(r)
+	var imageBytes []byte
+	if fileExt == "png" {
+		imageBytes = ConvertToJpegFromPng(imageBytes)
+	} else {
+		imageBytes = imageRawBytes
+	}
 	hash := sha256.New()
 	hash.Write(imageBytes)
 	md := hash.Sum(nil)
 	fileName := hex.EncodeToString(md)
-	fileExt := ff.FileExtension(r)
 	filePath := fileName + fileExt
 	fullFilePath := fmt.Sprintf("%s/%s", uuidv4, filePath)
 	auth, err := aws.EnvAuth()
