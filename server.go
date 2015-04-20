@@ -133,6 +133,7 @@ func chunkedReader(w http.ResponseWriter, params martini.Params, r *http.Request
 			if err != nil {
 				panic(err.Error())
 			}
+			w.Header().Set("Content-Type", "application/json")
 			w.Write(imageStructBytes)
 		}
 	}
