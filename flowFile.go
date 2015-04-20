@@ -101,7 +101,14 @@ func (ff *FlowFile) AssembleChunks() []byte {
 	if err != nil {
 		panic(err)
 	}
-	return bytes.Join(chunks, nil)
+	buff := new(bytes.Buffer)
+	for _, b := range chunks {
+		_, err := buff.Write(b)
+		if err != nil {
+			panic(err)
+		}
+	}
+	return buff.Bytes()
 }
 
 func (ff *FlowFile) FileExtension(r *http.Request) string {
