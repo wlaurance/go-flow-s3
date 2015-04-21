@@ -6,7 +6,7 @@ import (
 	"image/jpeg"
 )
 
-func getImageConfigFromBytes(b []byte) image.Config {
+func getImageConfigFromJpegBytes(b []byte) image.Config {
 	config, err := jpeg.DecodeConfig(bytes.NewReader(b))
 	if err != nil {
 		panic(err)
@@ -15,9 +15,9 @@ func getImageConfigFromBytes(b []byte) image.Config {
 }
 
 func GetWidthFromJpegBytes(b []byte) int {
-	return getImageConfigFromBytes(b).Width
+	return getImageConfigFromJpegBytes(b).Width
 }
 
 func GetHeightFromJpegBytes(b []byte) int {
-	return getImageConfigFromBytes(b).Height
+	return getImageConfigFromJpegBytes(b).Height
 }
