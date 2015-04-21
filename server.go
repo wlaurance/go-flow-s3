@@ -124,14 +124,17 @@ func chunkedReader(w http.ResponseWriter, params martini.Params, r *http.Request
 			panic(err.Error())
 		}
 		if ff.NumberOfChunks() == cT {
-			url, err := exportFlowFile(ff, params["uuidv4"], r)
+			defer ff.Delete()
+			imageStruct, err := exportFlowFile(ff, params["uuidv4"], r)
 			if err != nil {
 				panic(err.Error())
 			}
-			if url != "" {
-				w.Write([]byte(url))
+			imageStructBytes, err := json.Marshal(imageStruct)
+			if err != nil {
+				panic(err.Error())
 			}
-			storeURL(url, params["uuidv4"])
+			w.Header().Set("Content-Type", "application/json")
+			w.Write(imageStructBytes)
 		}
 	}
 }
@@ -145,11 +148,14 @@ func getDB() *sql.DB {
 	return db
 }
 
-func storeURL(url, uuidv4 string) {
+func storeAttributes(url, uuidv4 string, height, width int) ImageData {
 	db := getDB()
 	_, err := db.Query("insert into vault (uuid, url) values ($1, $2)", uuidv4, url)
 	if err != nil {
 		panic(err.Error())
+	}
+	return ImageData{
+		url, uuidv4, height, width,
 	}
 }
 
@@ -168,8 +174,9 @@ func getBucketUrls(uuidv4 string) []string {
 	return urls
 }
 
-func exportFlowFile(ff *FlowFile, uuidv4 string, r *http.Request) (string, error) {
+func exportFlowFile(ff *FlowFile, uuidv4 string, r *http.Request) (ImageData, error) {
 	imageRawBytes := ff.AssembleChunks()
+	oldFileExt := ff.FileExtension(r)
 	fileExt := ff.FileExtension(r)
 	var imageBytes []byte
 	if fileExt == ".png" {
@@ -193,8 +200,15 @@ func exportFlowFile(ff *FlowFile, uuidv4 string, r *http.Request) (string, error
 	mimeType := mime.TypeByExtension(fileExt)
 	putError := bucket.Put(fullFilePath, imageBytes, mimeType, s3.PublicRead)
 	if putError != nil {
-		return "", putError
+		return ImageData{}, putError
 	}
-	defer ff.Delete()
-	return bucket.URL(fullFilePath), nil
+
+	imageConfig := GetImageConfigFromBytesAndType(oldFileExt, imageRawBytes)
+
+	return ImageData{
+		Url:    bucket.URL(fullFilePath),
+		Uuid:   fileName,
+		Height: imageConfig.Height,
+		Width:  imageConfig.Width,
+	}, nil
 }

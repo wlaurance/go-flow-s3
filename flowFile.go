@@ -15,6 +15,13 @@ type FlowFile struct {
 	name string
 }
 
+type ImageData struct {
+	Url    string `json:"url"`
+	Uuid   string `json:"uuid"`
+	Height int    `json:"height"`
+	Width  int    `json:"width"`
+}
+
 func CreateFlowFile(params martini.Params, r *http.Request) *FlowFile {
 	return &FlowFile{params["uuidv4"] + r.FormValue("flowIdentifier")}
 }
