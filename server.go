@@ -125,11 +125,10 @@ func chunkedReader(w http.ResponseWriter, params martini.Params, r *http.Request
 		}
 		if ff.NumberOfChunks() == cT {
 			defer ff.Delete()
-			url, bytes, err := exportFlowFile(ff, params["uuidv4"], r)
+			imageStruct, err := exportFlowFile(ff, params["uuidv4"], r)
 			if err != nil {
 				panic(err.Error())
 			}
-			imageStruct := storeAttributes(url, params["uuidv4"], GetHeightFromJpegBytes(bytes), GetWidthFromJpegBytes(bytes))
 			imageStructBytes, err := json.Marshal(imageStruct)
 			if err != nil {
 				panic(err.Error())
@@ -175,8 +174,9 @@ func getBucketUrls(uuidv4 string) []string {
 	return urls
 }
 
-func exportFlowFile(ff *FlowFile, uuidv4 string, r *http.Request) (string, []byte, error) {
+func exportFlowFile(ff *FlowFile, uuidv4 string, r *http.Request) (ImageData, error) {
 	imageRawBytes := ff.AssembleChunks()
+	oldFileExt := ff.FileExtension(r)
 	fileExt := ff.FileExtension(r)
 	var imageBytes []byte
 	if fileExt == ".png" {
@@ -200,7 +200,15 @@ func exportFlowFile(ff *FlowFile, uuidv4 string, r *http.Request) (string, []byt
 	mimeType := mime.TypeByExtension(fileExt)
 	putError := bucket.Put(fullFilePath, imageBytes, mimeType, s3.PublicRead)
 	if putError != nil {
-		return "", nil, putError
+		return ImageData{}, putError
 	}
-	return bucket.URL(fullFilePath), imageRawBytes, nil
+
+	imageConfig := GetImageConfigFromBytesAndType(oldFileExt, imageRawBytes)
+
+	return ImageData{
+		Url:    bucket.URL(fullFilePath),
+		Uuid:   fileName,
+		Height: imageConfig.Height,
+		Width:  imageConfig.Width,
+	}, nil
 }
