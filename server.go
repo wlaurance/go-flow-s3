@@ -124,6 +124,7 @@ func chunkedReader(w http.ResponseWriter, params martini.Params, r *http.Request
 			panic(err.Error())
 		}
 		if ff.NumberOfChunks() == cT {
+			defer ff.Delete()
 			url, bytes, err := exportFlowFile(ff, params["uuidv4"], r)
 			if err != nil {
 				panic(err.Error())
@@ -201,6 +202,5 @@ func exportFlowFile(ff *FlowFile, uuidv4 string, r *http.Request) (string, []byt
 	if putError != nil {
 		return "", nil, putError
 	}
-	defer ff.Delete()
 	return bucket.URL(fullFilePath), imageRawBytes, nil
 }
