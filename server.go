@@ -153,7 +153,7 @@ func storeAttributes(imageData ImageData) {
 	db := getDB()
 	defer db.Close()
 	uuidv4, url, height, width := imageData.Uuid, imageData.Url, imageData.Height, imageData.Width
-	_, err := db.Query("insert into vault (uuid, url, height, width) values ($1, $2)", uuidv4, url, height, width)
+	_, err := db.Query("insert into vault (uuid, url, height, width) values ($1, $2, $3, $4)", uuidv4, url, height, width)
 	if err != nil {
 		panic(err.Error())
 	}
