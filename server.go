@@ -207,7 +207,7 @@ func exportFlowFile(ff *FlowFile, uuidv4 string, r *http.Request) (ImageData, er
 
 	return ImageData{
 		Url:    bucket.URL(fullFilePath),
-		Uuid:   fileName,
+		Uuid:   uuidv4,
 		Height: imageConfig.Height,
 		Width:  imageConfig.Width,
 	}, nil
