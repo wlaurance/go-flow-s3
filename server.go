@@ -16,9 +16,9 @@ import (
 	"log"
 	"mime"
 	"net/http"
-	"net/url"
 	"os"
 	"strconv"
+	"strings"
 )
 
 var skipUpload string = os.Getenv("SKIP_S3_UPLOAD")
@@ -209,11 +209,8 @@ func exportFlowFile(ff *FlowFile, uuidv4 string, r *http.Request) (ImageData, er
 
 	var fullURL string
 	if cloudfrontURL != "" {
-		u, err := url.Parse(cloudfrontURL + "/" + fullFilePath)
-		if err != nil {
-			panic(err.Error())
-		}
-		fullURL = u.String()
+		cloudfrontURL = strings.TrimSuffix(cloudfrontURL, "/")
+		fullURL = cloudfrontURL + "/" + fullFilePath
 	} else {
 		fullURL = bucket.URL(fullFilePath)
 	}
