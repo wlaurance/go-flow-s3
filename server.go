@@ -129,6 +129,7 @@ func chunkedReader(w http.ResponseWriter, params martini.Params, r *http.Request
 			if err != nil {
 				panic(err.Error())
 			}
+			storeAttributes(imageStruct)
 			imageStructBytes, err := json.Marshal(imageStruct)
 			if err != nil {
 				panic(err.Error())
@@ -148,14 +149,13 @@ func getDB() *sql.DB {
 	return db
 }
 
-func storeAttributes(url, uuidv4 string, height, width int) ImageData {
+func storeAttributes(imageData ImageData) {
 	db := getDB()
-	_, err := db.Query("insert into vault (uuid, url) values ($1, $2)", uuidv4, url)
+	defer db.Close()
+	uuidv4, url, height, width := imageData.Uuid, imageData.Url, imageData.Height, imageData.Width
+	_, err := db.Query("insert into vault (uuid, url, height, width) values ($1, $2)", uuidv4, url, height, width)
 	if err != nil {
 		panic(err.Error())
-	}
-	return ImageData{
-		url, uuidv4, height, width,
 	}
 }
 
