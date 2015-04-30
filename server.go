@@ -16,6 +16,7 @@ import (
 	"log"
 	"mime"
 	"net/http"
+	"net/url"
 	"os"
 	"strconv"
 )
@@ -24,6 +25,7 @@ var skipUpload string = os.Getenv("SKIP_S3_UPLOAD")
 var boltChunks string = "BOLT_CHUNKS"
 
 var s3Bucket string = "S3_BUCKET"
+var cloudfrontURL string = os.Getenv("CLOUDFRONT_URL")
 
 func init() {
 	bChunks := os.Getenv(boltChunks)
@@ -205,8 +207,19 @@ func exportFlowFile(ff *FlowFile, uuidv4 string, r *http.Request) (ImageData, er
 
 	imageConfig := GetImageConfigFromBytesAndType(oldFileExt, imageRawBytes)
 
+	var fullURL string
+	if cloudfrontURL != "" {
+		u, err := url.Parse(cloudfrontURL + "/" + fullFilePath)
+		if err != nil {
+			panic(err.Error())
+		}
+		fullURL = u.String()
+	} else {
+		fullURL = bucket.URL(fullFilePath)
+	}
+
 	return ImageData{
-		Url:    bucket.URL(fullFilePath),
+		Url:    fullURL,
 		Uuid:   uuidv4,
 		Height: imageConfig.Height,
 		Width:  imageConfig.Width,
