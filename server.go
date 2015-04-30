@@ -200,7 +200,11 @@ func exportFlowFile(ff *FlowFile, uuidv4 string, r *http.Request) (ImageData, er
 	client := s3.New(auth, aws.USEast)
 	bucket := client.Bucket(os.Getenv(s3Bucket))
 	mimeType := mime.TypeByExtension(fileExt)
-	putError := bucket.Put(fullFilePath, imageBytes, mimeType, s3.PublicRead)
+	headers := map[string][]string{
+		"Content-Type":  {mimeType},
+		"Cache-Control": {"max-age=31536000"},
+	}
+	putError := bucket.PutHeader(fullFilePath, imageBytes, headers, s3.PublicRead)
 	if putError != nil {
 		return ImageData{}, putError
 	}
