@@ -132,6 +132,7 @@ func chunkedReader(w http.ResponseWriter, params martini.Params, r *http.Request
 				panic(err.Error())
 			}
 			storeAttributes(imageStruct)
+			imageStruct.Url = computeFullUrlFromPath(imageStruct.Url)
 			imageStructBytes, err := json.Marshal(imageStruct)
 			if err != nil {
 				panic(err.Error())
@@ -140,6 +141,23 @@ func chunkedReader(w http.ResponseWriter, params martini.Params, r *http.Request
 			w.Write(imageStructBytes)
 		}
 	}
+}
+
+func computeFullUrlFromPath(path string) string {
+	var fullURL string
+	if cloudfrontURL != "" {
+		cloudfrontURL = strings.TrimSuffix(cloudfrontURL, "/")
+		fullURL = cloudfrontURL + "/" + path
+	} else {
+		auth, err := aws.EnvAuth()
+		if err != nil {
+			log.Fatal(err)
+		}
+		client := s3.New(auth, aws.USEast)
+		bucket := client.Bucket(os.Getenv(s3Bucket))
+		fullURL = bucket.URL(path)
+	}
+	return fullURL
 }
 
 func getDB() *sql.DB {
@@ -211,16 +229,8 @@ func exportFlowFile(ff *FlowFile, uuidv4 string, r *http.Request) (ImageData, er
 
 	imageConfig := GetImageConfigFromBytesAndType(oldFileExt, imageRawBytes)
 
-	var fullURL string
-	if cloudfrontURL != "" {
-		cloudfrontURL = strings.TrimSuffix(cloudfrontURL, "/")
-		fullURL = cloudfrontURL + "/" + fullFilePath
-	} else {
-		fullURL = bucket.URL(fullFilePath)
-	}
-
 	return ImageData{
-		Url:    fullURL,
+		Url:    fullFilePath,
 		Uuid:   uuidv4,
 		Height: imageConfig.Height,
 		Width:  imageConfig.Width,
